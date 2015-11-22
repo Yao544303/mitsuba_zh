@@ -1,0 +1,127 @@
+\chapter{场景文件格式}
+Mitsuba 使用一种非常简单和普遍的基于XML场景文件描述方式。基于整个框架模块化的设计理念，场景文件可以分割成不同的部分，之间靠接口结合。如下我们会举例说明。
+\par 
+一个拥有单一网格和默认光照和视点的简单场景看上去像这个样子：
+\begin{lstlisting}
+	<?xml  version="1.0"  encoding="utf-8"?>
+	<scene  version="0.5.0">
+	<shape  type="obj">
+	<string  name="filename"  value="dragon.obj"/>
+	</shape>
+	</scene>
+\end{lstlisting}
+\par 
+Scence version(场景版本)参数表示使用该场景的Mitsuba发布版本号。该信息使得Mitsuba总能正确地处理该场景文件而不论在将来场景描述语言有任何变化。
+\par 
+这个例子包含了关于格式最重要的信息：（吐槽：就像hello world 一样 包含了输入 处理 输出）你可以拥有对象（比如由scene 和 shape 标签实例化的），这些对象直接是可以相互嵌套的。对每一个对象都可以添加属性（比如string 标签），这些属性进一步的描述其行为。除了根对象（scene）之外的所有的对象都能使渲染器从磁盘搜索并导入对应的插件，因此你必须提供使用type=“…”提供插件名字。
+\par 
+对象标签也让渲染器知道它实例化的是何种对象：举个栗子，使用shape标签载入的插件必须遵循shape 接口。简单的，我们可以写成如下形式：
+\begin{lstlisting}
+	<?xml  version="1.0"  encoding="utf-8"?>
+	<scene  version="0.5.0">
+	<shape  type="sphere">
+	<float  name="radius"  value="10"/>
+	</shape>
+	</scene>
+\end{lstlisting}
+\par 
+这载入了一个不同插件（sphere），虽然这任然是一个Shape，但却代表着半径为10的一个球体。Mitsuba 有大量这样的插件，请在下一章中学习它们。
+\par 
+最常见的场景设置是先声明一个integrator，一些几何体，一个传感器，一部电影，一个采样器以及更多的元素。这是一个较为复杂的例子：
+\begin{lstlisting}
+	<?xml  version="1.0"  encoding="utf-8"?>
+	<scene  version="0.5.0">
+	<integrator  type="path">
+	<!--  Path  trace  with  a  max.  path  length  of  8  -->
+	<integer  name="maxDepth"  value="8"/>
+	</integrator>
+	<!--  Instantiate  a  perspective  camera  with  45  degrees  field  of  view  -->
+	<sensor  type="perspective">
+	<!--  Rotate  the  camera  around  the  Y  axis  by  180  degrees  -->
+	<transform  name="toWorld">
+	<rotate  y="1"  angle="180"/>
+	</transform>
+	<float  name="fov"  value="45"/>
+	<!--  Render  with  32  samples  per  pixel  using  a  basic
+	independent  sampling  strategy  -->
+	<sampler  type="independent">
+	<integer  name="sampleCount"  value="32"/>
+	</sampler>
+	<!--  Generate  an  EXR  image  at  HD  resolution  -->
+	<film  type="hdrfilm">
+	<integer  name="width"  value="1920"/>
+	<integer  name="height"  value="1080"/>
+	</film>
+	</sensor>
+	<!--  Add  a  dragon  mesh  made  of  rough  glass  (stored  as  OBJ  file)  -->
+	<shape  type="obj">
+	<string  name="filename"  value="dragon.obj"/>
+	<bsdf  type="roughdielectric">
+	<!--  Tweak  the  roughness  parameter  of  the  material  -->
+	<float  name="alpha"  value="0.01"/>
+	</bsdf>
+	</shape>
+	<!--  Add  another  mesh  --  this  time,  stored  using  Mitsuba's  own
+	(compact)  binary  representation  -->
+	<shape  type="serialized">
+	<string  name="filename"  value="lightsource.serialized"/>
+	<transform  name="toWorld">
+	<translate  x="5"  y="-3"  z="1"/>
+	</transform>
+	<!--  This  mesh  is  an  area  emitter  -->
+	<emitter  type="area">
+	<rgb  name="radiance"  value="100,400,100"/>
+	</emitter>
+	</shape>
+	</scene>
+\end{lstlisting}
+\par这个例子介绍了一些列新的对象（integrator, sensor, bsdf, sampler, film,
+and emitter) 和属性 (integer, transform, and rgb）。在该例子中你可以看出，除了一些有继承关系指向别的对象的，对象通常在最顶层声明。举个例子，BSDFs常常由一个确定的几何对象指定，所以它们往往是shape的一个子对象。相似的，sampler 和 film 嵌入sensor。
+
+\section{属性类型}
+这一节说明对象可用的所有属性。如果你对每个属性是由哪个插件提供的更感兴趣，请阅读下一节。
+注：这一节的属性翻译皆保留原文
+
+\subsection{Numbers（数字）}
+整数和浮点数可以通过如下形式传递值：
+（类似 key –value 键值对关系）
+\begin{lstlisting}
+	<integer  name="intProperty"  value="1234"/>
+	<float  name="floatProperty"  value="1.234"/>
+	<float  name="floatProperty2"  value="-1.5e3"/>
+\end{lstlisting}
+注意到你必须按照对象的要求的格式来描述，举个栗子，你不能向一个要求浮点数的对象传递整数。
+
+\subsection{Strings（字符串）}
+如下传递：
+\begin{lstlisting}
+	<string  name="stringProperty"  value="This  is  a  string"/>
+\end{lstlisting}
+
+\subsection{RGB 色彩值}
+在Mitsuba中，颜色数据使用<rgb> <srgb> <spectrum> 标签。先介绍前两个用的比较多的。RGB标签是指用浮点数表示的红、绿、蓝的颜色值，当指定反射系数时这个值通常在0-1之间。<srgb>标签使得指定的值通过逆sRGB 伽马曲线线性化。（翻得乱七八糟 看参考文献）
+\begin{lstlisting}
+	<rgb  name="spectrumProperty"  value="0.2,  0.8,  0.4"/>
+	<srgb  name="spectrumProperty"  value="0.4,  0.3,  0.2"/>
+\end{lstlisting}
+
+<srgb> 标签也接受HTML语法的二进制值 如：
+
+\begin{lstlisting}
+	<srgb  name="spectrumProperty"  value="#f9aa34"/>
+\end{lstlisting}
+\par
+当Mitsuba 在默认设置下编译后，内部使用线性RGB来表示颜色，所以这些值直接就被拿来用了。但是，设置某些特定渲染器时，必须找到一种可以与RGB想媲美的色彩空间。这是一个经典的待解决问题，因为对于现实的光谱而言，某一颜色值是无限小数。
+\par
+Mitsuba依靠Smits[42] 提出的方法来寻找一种连续光滑和物理上“貌似正确”的色彩空间。为此，Mitsuba选择基于Simt’s方法改进后得到，基于一个包含反射系数或辐射值强度的颜色空间。这个选择可以通过intent 这个XML 属性实现。
+
+\begin{lstlisting}
+	<rgb  name="spectrumProperty"  intent="reflectance"  value="0.2,  0.8,  0.4"/>
+	<rgb  name="spectrumProperty"  intent="illuminant"  value="0.2,  0.8,  0.4"/>
+\end{lstlisting}
+
+\par 
+通常，这个属性不是必须指定的：Mitsuba在指定光源的RGB时使用intent="illuminant"，其他情况下使用intent="reflectance"
+
+\subsection{色彩空间}
+

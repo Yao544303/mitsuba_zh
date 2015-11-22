@@ -1,0 +1,142 @@
+\chapter{基本使用方法}
+Mitsuba 的渲染功能可以通过一个命令行接口和一个交互式的基于QT的前端实现。这一章提供一些基本使用说明。
+
+\section{交互式前端}
+你可以在MacOS中运行Mitsuba.app，Windows中运行mtsgui.exe，在Linux中执行mtsgui（在sourcing setpath.sh 之后）来启动交互式前端。你可以通过拖拽场景文件到mitsuba应用图标上或者在应用中打开的方式来载入场景。两段视频指南可以在如下地址找到\url{http://vimeo.com/13480342}（旧的）\url{http://vimeo.com/50528092}（描述了新特性）
+
+\section{命令行接口}
+Mitsuba 的二进制文件可以选择无需交互前端的命令行方式使用和批处理。为了获取它支持的参数，运行如下命令：
+\begin{lstlisting}
+$mitsuba
+\end{lstlisting}
+\par
+表1 显示了这条命令的输出结果。最常用的操作是渲染单一场景，命令如下：
+\begin{lstlisting}
+$mitsuba path-to/my-scene.xml
+\end{lstlisting}
+\par
+下一节解释命令行的多个特性。
+
+\subsection{联网渲染（云渲染？）}
+Mitsuba 能够联接到网络中的渲染节点，从而在追加的核心上并行完成渲染任务。为了实现这个，传递了一个 - c 打头后面跟着用分号分隔开的机器列表的命令。
+\begin{lstlisting}
+$  mitsuba -c machine1;machine2;...path-to/my-scene.xml
+\end{lstlisting}
+\par 
+这里有两种不同的方式来联接到渲染节点
+\begin{itemize}
+	\item \textbf{直接方式：} 这种方式中，你创建了一个联向另一台机器上正在运行中mtssrv实例的联接（mtssrv 是Mitsuba的服务进程）。从性能的角度而言，这种方法优于下文所述的SSH方法。但这种方法也存在一些不足：首先，你需要手动启动每台机器上的mtssrv。
+	\par更为重要的是，直接通信协议无法应对恶意用户的干扰。而一直检查通信流中是否有非法的数据序列，开销又是很大的，所以Mitsuba并未实现这一块功能。综上，导致了你必须处于一个可信的网络中时，才可以使用直接方式。
+	\par 对于直接连接，你可以按照如下方式简化接口:
+	\begin{lstlisting}
+		$ mitsuba -c machine:1234 path-to/my-scene.xml
+	\end{lstlisting}
+	当没有端口显示指定时，Mitsuba使用默认值7554。
+	
+	\item \textbf{SSH：}这种方法工作如下：当一台远程计算机创建了一个Mitsuba实例的时候，便创建一个到该计算机的SSH联接。所有子序列通信都通过这一加密链接进行。这是一种完全的安全措施，但也会变慢。当你渲染一个复杂的场景的时候，这是一个好的选择，因为在通信上的开销相比与在渲染上的开销比重下降。
+	\par 这样一个SSH联接可以用如下方式创建：
+	\begin{lstlisting}
+		$ mitsuba -c username@machine path-to/my-scene.xml
+	\end{lstlisting}
+	\par上述命令假设远程计算机的主目录中包含名为mitsuba的mitsuba源目录，其中包含以编译的mitsuba二进制文件。如果不是，你需要人为的提供目录如下：
+	\begin{lstlisting}
+		$  mitsuba  -c  username@machine:/opt/mitsuba  path-to/my-scene.xml
+	\end{lstlisting}
+	\par对于SSH方法而言，你必须开启无密码认证。尝试开启一个终端并执行命令 ssh username@machine(根据你的实际联接情况替换细节参数)。如果要求你输入密码，说明你没有设置正确，请查看..
+	\url{http://www.debian-administration.org/articles/152}
+	\par在Windows平台，因为没有合适的SSH默认客户端，情形更为复杂。为了得到SSH联接，Mitsuba 需要plink.exe(来自PuTTY)。对于基于Linux/OSX 服务器的无密码认证，使用puttygen.exe转化你的私人密钥为PuTTY’s 格式。之后，启动pageant.exe来载入和验证密钥。上述所有工具都可从PuTTY网站获得。
+	\par 混合使用两种方式也是可能的。
+\end{itemize}
+\par 当使用命令行来进行多次云渲染时，每一次都进行指定是一件很枯燥的事。你可以选择通过载入text文件的方式来进行，text文件中每一行包含一条独立联接描述:
+
+\begin{lstlisting}
+$ mitsuba -s servers.txt path-to/my-scene.xml
+\end{lstlisting}
+\par 而一个servers.txt包含可能如下：
+\begin{lstlisting}
+	user1@machine1.domain.org:/opt/mitsuba
+	machine2.domain.org
+	machine3.domain.org:7346
+\end{lstlisting}
+
+\subsection{传递参数}
+\par 任何在XML格式的场景文件中的属性，都可以通过命令行来出入。
+\par举个栗子，你可以使用同样的材质不同的反射值渲染同一场景多次而只需改动如下：
+\begin{lstlisting}
+	<bsdf  type="diffuse">
+	<spectrum  name="reflectance"  value="$reflectance"/>
+	</bsdf>
+\end{lstlisting}
+
+\par然后执行Mitsuba如下:
+\begin{lstlisting}
+	$  mitsuba  -Dreflectance=0.1  -o  ref_0.1.exr  scene.xml
+	$  mitsuba  -Dreflectance=0.2  -o  ref_0.2.exr  scene.xml
+	$  mitsuba  -Dreflectance=0.5  -o  ref_0.5.exr  scene.xml
+\end{lstlisting}
+
+\subsection{保存部分图像}
+在Linux 和OSX 上执行很长的命令序列时，可以发送如下命令：
+\begin{lstlisting}
+	$  killall  -HUP  mitsuba
+\end{lstlisting}
+\par 
+这会使渲染系统先保存部分已经渲染好的图像，在这之后，系统会继续渲染。
+这在检查结果是否正确的时候很有用。
+
+\subsection{渲染动画}
+命令行接口能完美的适合多个文件的批操作。在文件名之间添加通配符即可。
+\par 
+如果你已经完成了部分帧的渲染，并且你只想完成剩下部分的渲染，添加-x标记，那么所有已经存在输出的文件将会被跳过。你也可以使用 –j 参数 让调度程序同时在多台服务器上运行，这能在加速多台机器并行的速度：当一部分机器完成当前帧的渲染之后，他们可以立即开始进行下一帧的渲染而不需要等待其他机器渲染技术。总而言之，你可以通过如下命令开启:
+\begin{lstlisting}
+	$ mitsuba -xj 2 -c machine1;machine2;...animation/frame_*.xml
+\end{lstlisting}
+\par 
+注意到，这需要一个能够将星号扩展成文件名列表的shell。默认的Windows shell cmd 没有这个功能。但是，PowerSHell 支持如下语法：
+\begin{lstlisting}
+	dir frame_*.xml | % { <path to  mitsuba.exe> $_ }
+\end{lstlisting}
+
+\section{其他功能}
+Mitsuba带有其他一些功能，在本节如下部分会表述：
+
+\subsection{直接联接服务器}
+可以使用mtssrv 执行创建一个Mitsuba计算节点。默认的，这会在端口7554 中列出：
+\begin{lstlisting}
+	$ mtssrv
+	..
+	maxwell: Listening on port 7554..Send Ctrl-C or SIGTERM to stop.
+\end{lstlisting}
+\par 
+输入 mtssrv –h 来查看可用操作。如果你发现你不能连上服务器，可能是mtssrv 监听了错误的接口。在这种情况下，请检查IP和hostname：
+\begin{lstlisting}
+	$ mtssrv -i maxwell.cs.cornell.edu
+\end{lstlisting}
+一个在5.2中提出的建议是只在可信的网络中运行mtssrv
+\par 
+Mtssrv一个很漂亮的特性是它也支持-c 和–s的参数（能够创建到追加服务器的联接）。使用这种特性，用户可以创建多层的计算节点。举个例子，位于根节点的mttsrv实例能够和其他运行着mtssrv的机器共享他的工作，这些机器又能和更多机器共享他们的工作。以此类推。
+\par 
+这种分层的并行性是显而易见的：当子节点联接到根节点的时候，整个系统看上去就像一台拥有成百上千计算核心的机器，它可以发布任务而无需担心在层内部是如何精确传递的。
+这样的分层机制，主要用处是消除向远程机器发布大型资源时的通信瓶颈。想象如下场景：你想在家渲染一个50MB大小的场景，但是渲染的太慢了。你决定理由你工作地方的机器，但是由于相对较慢的贷款和你需要分割你的场景到每一个具体计算节点，这通常不会变的更快。
+\par 
+使用mtssrv，你可以在你工作地方制定一个中心调度节点，这您能够接受通讯并为其他机器分配渲染任务。在这种情况下，你将只需要传递场景一次，剩下的分配调度工作将在你的工作地点进行。
+
+\subsection{Utility launcher}
+当进行一个大项目时，人们常常需要实现许多功能性程序来执行简单的任务，比如应用一个图片的过滤器，或者存储一个矩阵。在Mitsuba这样的框架中，这很不幸的牵涉到之前提到在所有支持平台上初始化必要的API时一项很重要的编码。为了减少这项对于程序员而言单调乏味的工作，Mitsuba 使用了名为mtsutil的 Utility launcher。
+\par 
+一般的命令为:
+\begin{lstlisting}
+	$ mtsutil [options] <utility name> [arguments]
+\end{lstlisting}
+\par
+对于列出的所有支持的操作和功能，可以输入无参数的命令。
+
+\subsection{色调映射}
+在这需要提到的一个常用的功能是成批的色调映射，这个功能载入EXR/RGBE 图像并且写入8-bit的PNG/JPG 的图像。
+列表2 列出了可用的命令和选项：
+
+
+
+
+
+
