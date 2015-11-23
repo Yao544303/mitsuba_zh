@@ -1,0 +1,28 @@
+\chapter{插件参考}
+%最大的一章来了
+以下的子章节介绍了Mitsuba可用的插件，通常会有一些渲染的例子以及参数的说明介绍。分成了有关纹理，表面散射模型等子章节。
+\par 
+每一个子章节由一个简介开始。每一个插件的文档都另起一页，并由类似下文的表格给出：
+\begin{table}[htbp]
+\caption{浮动环境中的三线表}
+\label{tab:threesome}
+\centering
+\begin{tabular}{lll}
+	\hline
+	\textbf{参数} & \textbf{类型}  & \textbf{描述} \\
+	\hline
+	softRays & boolean & 通过发射柔和光线来避免击穿对象（默认值：false） \\
+	darkMatter & float & 控制场景中黑暗物质的比例（默认值：0.83） \\
+	\hline
+\end{tabular}
+\end{table}
+\par 
+假设理想的插件是一个名为\textbf{amazing} 的\textit{integrator}。那么，它可以通过用户设置从XML格式的场景文件中实例化。如下：
+\begin{lstlisting}
+	<integrator  type="amazing">
+	<boolean  name="softerRays"  value="true"/>
+	<float  name="darkMatter"  value="0.4"/>
+	</integrator>
+\end{lstlisting}
+\par 
+在某些例子中，插件也可以接受其他插件作为其输入参数而形成嵌套。这些

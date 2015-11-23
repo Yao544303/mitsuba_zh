@@ -1,0 +1,24 @@
+\chapter{杂七杂八的话题}
+\section{颜色空间一句话攻略}
+当使用一个Mitsuba的发布版本，或使用默认设置编译的版本，渲染器内部是以\textit{RGB}模式操作的：所有的计算都是在红，绿，蓝三个值的基础上进行的。
+\par 
+更加确切的说，是由sRGB（）ITU-R Rec.BT.709-3 primaries with a D65 white point）最初定义的红，绿，蓝的光照强度值。Mitsuba在渲染前将所有的输入数据转换到这个颜色空间。对大多数应用而言，有着令人满意的效率和效果。
+\par 
+使用ldrfilm 输出的低动态范围（低频）图像会以sRGB兼容格式存储，因为用户的伽马曲线也由此标准委托管理。他们应该能在多种播放设备上运行。
+\par 
+当保存高频输出时，计算好的辐射度值以线性形式输出，这也是存储高频图像最常见的方式。重要的一点是，其他应用未必都支持这种线性化的sRGB空间，事实上，Mac OS 目前就没法很好的显示。
+\subsection{光谱渲染}
+一些实验性的渲染应用会需要一个更加真实的颜色空间用来做交互渲染。在这种情况下，Mitsuba可以选择\textit{spectral}模式。这用\textbf{SPECTRUM\_SAMPLES=n}（第四章）参数进行编译即可。其中n常常在15到30之间。
+\par 
+现在，所有的输入参数都使用确定的颜色值转换到了颜色空间，所有的计算都使用这一空间。输出图像文件时略有不同：当期望光谱输出（）hdrfilm,tiledhdrfilm,mfilm 支持此功能）时，Mitsuba创建一个拥有许多颜色通道的特殊的图像文件。一般的，其他应用无法显示这些图像文件。Mitsuba的GUI可以浏览他们。
+\par 
+也可以输出XYZ三个颜色值，这这种情况下光谱数据由CIE 1931 颜色匹配曲线影响。这对希望使用全光谱域的用户是非常有用的。
+
+\section{依靠Makefiles使用Mitsuba}
+有时候，依靠一个标准的Unix Makefile 来运行mitsuba是非常有用的。不过这也略微不便，因为Makefiles中的 shell 命令行使用的是经典的sh shell，这与\textbf{setpath.sh}脚本不兼容。此例子中在一个简单的工作区调用call 或者 zsh：
+\begin{lstlisting}
+	MITSUBA_HOME=<..>
+	%.exr:  %.xml
+	bash  -c  ".  $(MITSUBA_HOME)/setpath.sh;  mitsuba  -o  $@  $<"
+\end{lstlisting}
+
